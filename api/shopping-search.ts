@@ -42,7 +42,19 @@ export default async function handler(request) {
     const serpApiUrl = `https://serpapi.com/search.json?engine=google_shopping&q=${encodeURIComponent(product)}&location=${encodeURIComponent(locationName)}&gl=${gl}&hl=en&api_key=${SERPAPI_KEY}`;
 
     try {
-        const apiResponse = await fetch(serpApiUrl);
+        console.log(`Attempting to fetch from SerpApi: ${serpApiUrl.replace(SERPAPI_KEY, '[REDACTED]')}`);
+        
+        const controller = new AbortController();
+        // Set a 25-second timeout for the API call
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+        const apiResponse = await fetch(serpApiUrl, { signal: controller.signal });
+        
+        // Clear the timeout if the fetch completes in time
+        clearTimeout(timeoutId);
+        
+        console.log(`SerpApi responded with status: ${apiResponse.status}`);
+
         const data = await apiResponse.json();
 
         // Pass through the response from SerpApi directly to the client.
@@ -52,6 +64,14 @@ export default async function handler(request) {
         });
 
     } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            console.error("Error: The request to SerpApi timed out after 25 seconds.");
+            return new Response(JSON.stringify({ error: 'The shopping search service took too long to respond. Please try again later.' }), {
+                status: 504, // Gateway Timeout
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
         console.error("Error fetching from SerpApi via proxy:", error);
         return new Response(JSON.stringify({ error: 'An internal server error occurred while contacting the shopping service.' }), {
             status: 500,
