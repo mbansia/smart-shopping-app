@@ -8,37 +8,50 @@ import { GoogleGenAI } from '@google/genai';
  * @returns {Promise<Response>} A response object to send back to the browser.
  */
 export default async function handler(request) {
+  console.log('[generate-content] Function invoked.');
+
   if (request.method !== 'POST') {
+    console.warn(`[generate-content] Received a ${request.method} request, but only POST is allowed.`);
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' },
     });
   }
-
+  
+  console.log('[generate-content] Reading API_KEY from environment variables...');
   const apiKey = process.env.API_KEY;
+
   if (!apiKey) {
-    console.error("Vercel Diagnostics: process.env.API_KEY is NOT FOUND in /api/generate-content.");
+    console.error('[generate-content] FATAL: process.env.API_KEY is NOT FOUND.');
+    console.log(`[generate-content] Diagnostics: typeof process.env.API_KEY is '${typeof apiKey}'`);
     return new Response(JSON.stringify({ error: 'Server configuration error: AI service key is not configured.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  
+  // Use a shortened key for logging to confirm it's present without exposing it.
+  const shortApiKey = `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`;
+  console.log(`[generate-content] API_KEY found successfully. Key: ${shortApiKey}`);
 
   try {
+    console.log('[generate-content] Parsing request body...');
     const body = await request.json();
     const { model, contents, config } = body;
+    console.log(`[generate-content] Request body parsed. Model: ${model}`);
 
     if (!model || !contents) {
+      console.error('[generate-content] Validation Error: Missing model or contents in request body.');
       return new Response(JSON.stringify({ error: 'Missing required parameters: model and contents.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
     
-    console.log("Vercel Diagnostics: process.env.API_KEY was found. Initializing GoogleGenAI on the server.");
+    console.log('[generate-content] Initializing GoogleGenAI on the server...');
     const ai = new GoogleGenAI({ apiKey });
 
-    console.log(`Making Gemini call with model: ${model}`);
+    console.log(`[generate-content] Making call to Gemini with model: ${model}...`);
     const geminiResponse = await ai.models.generateContent({
       model,
       contents,
@@ -46,6 +59,7 @@ export default async function handler(request) {
     });
     
     const responseText = geminiResponse.text;
+    console.log('[generate-content] Successfully received response from Gemini.');
 
     return new Response(JSON.stringify({ text: responseText }), {
       status: 200,
@@ -53,7 +67,7 @@ export default async function handler(request) {
     });
 
   } catch (error) {
-    console.error("Error in /api/generate-content:", error);
+    console.error("[generate-content] An error occurred during execution:", error);
     let errorMessage = 'An internal server error occurred while contacting the AI service.';
     if (error instanceof Error) {
         errorMessage = error.message;
