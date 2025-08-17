@@ -24,7 +24,8 @@ export default async function handler(request) {
   if (!apiKey) {
     console.error('[generate-content] FATAL: process.env.API_KEY is NOT FOUND.');
     console.log(`[generate-content] Diagnostics: typeof process.env.API_KEY is '${typeof apiKey}'`);
-    return new Response(JSON.stringify({ error: 'Server configuration error: AI service key is not configured.' }), {
+    // This error message is specifically crafted to be caught by the frontend.
+    return new Response(JSON.stringify({ error: 'Server configuration error: API key is not configured.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
