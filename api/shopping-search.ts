@@ -9,6 +9,7 @@
  * @returns {Promise<Response>} A response object to send back to the browser.
  */
 export default async function handler(request) {
+    console.log("--- /api/shopping-search endpoint invoked ---");
     // Reconstruct the original URL to easily parse search parameters.
     const url = new URL(request.url, `http://${request.headers.get('host')}`);
     const product = url.searchParams.get('product');
@@ -20,12 +21,16 @@ export default async function handler(request) {
     const SERPAPI_KEY = process.env.SERPAPI_KEY;
 
     if (!SERPAPI_KEY) {
-        console.error('SERPAPI_KEY is not set on the server.');
+        console.error('Vercel Diagnostics: process.env.SERPAPI_KEY is NOT FOUND.');
+        // This log helps confirm if the variable is missing or just empty.
+        console.log(`Vercel Diagnostics: typeof process.env.SERPAPI_KEY is '${typeof SERPAPI_KEY}'`);
         return new Response(JSON.stringify({ error: 'Server configuration error: The shopping search service is not configured.' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
         });
     }
+
+    console.log("Vercel Diagnostics: process.env.SERPAPI_KEY was found successfully.");
 
     if (!product || !locationName || !gl) {
         return new Response(JSON.stringify({ error: 'Missing required search parameters.' }), {
