@@ -101,9 +101,18 @@ async function searchShoppingDeals(product: string, locationName: string, gl: st
                 // This specific error suggests the serverless function is not running or available.
                 throw new Error("The shopping search service is not available. If you're developing locally, please ensure the backend API server is running.");
             }
-            // For other non-ok statuses (500, 400, etc.), we still want to throw an error.
-            const errorText = await response.text();
-            const errorMessage = `Shopping service request failed: ${response.status}. ${errorText}`;
+             // For other non-ok statuses (500, 400, 504 etc.), we try to parse a JSON error from our proxy.
+            let errorMessage = `Shopping service request failed with status: ${response.status}.`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    // Use the specific error message from the serverless function.
+                    errorMessage = errorData.error; 
+                }
+            } catch (e) {
+                // The response was not JSON, use the generic status message.
+                console.error("Could not parse JSON error from proxy response.");
+            }
             console.error('Proxy Error:', errorMessage);
             throw new Error(errorMessage);
         }
@@ -125,9 +134,13 @@ async function searchShoppingDeals(product: string, locationName: string, gl: st
             // For other fetch errors (e.g. network error, dev server not running),
             // we re-throw with a more user-friendly message.
             console.error(`Error fetching from backend proxy: ${error.message}`);
-            // Check if the message is the one we set for 404s
+            // Check if the message is one we set for 404s
             if (error.message.includes("The shopping search service is not available")) {
                  throw error;
+            }
+            // Throw the improved error message from the proxy or a connection error.
+            if(error.message.includes("Shopping service request failed") || error.message.includes("took too long to respond")) {
+                throw error;
             }
             throw new Error(`Could not connect to the shopping service. Please check your network connection.`);
         }
