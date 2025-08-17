@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import SmartFilters from './components/SmartFilters';
 import ResultsCanvas from './components/ResultsCanvas';
@@ -23,6 +23,27 @@ const App: React.FC = () => {
   const [conversationContext, setConversationContext] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    // Perform a health check on the backend when the app loads.
+    const checkApiHealth = async () => {
+      try {
+        const response = await fetch('/api/health');
+        if (!response.ok) {
+          throw new Error(`Health check failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        console.log("Health check successful:", data);
+      } catch (error) {
+        console.error("Health check failed:", error);
+        setInsightMessage({
+          texts: ["Could not connect to the backend services. Please refresh the page."],
+          type: 'error',
+        });
+      }
+    };
+    checkApiHealth();
+  }, []);
+
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -36,10 +57,19 @@ const App: React.FC = () => {
     abortControllerRef.current = new AbortController();
     
     const fullQuery = conversationContext ? `${conversationContext} | User's new message: ${query}` : query;
-    setInsightMessage({ texts: ['Thinking...'], type: 'loading' });
+    
+    const onStatusUpdate = (message: string) => {
+        setInsightMessage({ texts: [message], type: 'loading' });
+    };
+    
+    onStatusUpdate('Thinking...');
     
     try {
-      const result = await fetchProductDeals(fullQuery, abortControllerRef.current.signal);
+      const result = await fetchProductDeals(
+        fullQuery, 
+        abortControllerRef.current.signal,
+        onStatusUpdate
+      );
 
       if (result.followUpQuestion) {
         setInsightMessage({ texts: [result.followUpQuestion], type: 'prompt' });
@@ -70,7 +100,7 @@ const App: React.FC = () => {
         return; 
       }
       
-      console.error("Error in search flow:", error);
+      console.error("Caught error object:", error);
       let errorMessage = 'Sorry, something went wrong. Please try again.';
        if (error instanceof Error) {
         // More specific error messages for better UX
